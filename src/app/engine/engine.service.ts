@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {ElementRef, Injectable, NgZone, OnDestroy} from '@angular/core';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 
 @Injectable({providedIn: 'root'})
 export class EngineService implements OnDestroy {
@@ -48,9 +49,15 @@ export class EngineService implements OnDestroy {
     this.scene.add(this.light);
 
     const geometry = new THREE.BoxGeometry(1, 1, 1);
-    const material = new THREE.MeshBasicMaterial({color: 0x00ff00});
+    const material = new THREE.MeshBasicMaterial({color: 0x00ff00, wireframe: true});
     this.cube = new THREE.Mesh(geometry, material);
     this.scene.add(this.cube);
+
+    const controls = new OrbitControls(this.camera, this.renderer.domElement);
+    controls.target.set( 0, 0.5, 0 );
+		controls.update();
+		controls.enablePan = false;
+  	controls.enableDamping = true;
 
   }
 
@@ -77,8 +84,8 @@ export class EngineService implements OnDestroy {
       this.render();
     });
 
-    this.cube.rotation.x += 0.01;
-    this.cube.rotation.y += 0.01;
+    //this.cube.rotation.x += 0.01;
+    //this.cube.rotation.y += 0.01;
     this.renderer.render(this.scene, this.camera);
   }
 
