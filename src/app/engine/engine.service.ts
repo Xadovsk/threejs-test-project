@@ -11,6 +11,8 @@ export class EngineService implements OnDestroy {
   private light: THREE.AmbientLight;
 
   private cube: THREE.Mesh;
+  private cube2: THREE.Mesh;
+  private cube3: THREE.Mesh;
 
   private frameId: number = null;
 
@@ -48,10 +50,28 @@ export class EngineService implements OnDestroy {
     this.light.position.z = 10;
     this.scene.add(this.light);
 
+    //const texture = new THREE.TextureLoader().load( "assets/textures/yveltal.png" );
+    const texture = new THREE.TextureLoader().load( "https://1.bp.blogspot.com/-Amtf96EIKqE/YNIfb-CgJkI/AAAAAAAATlo/X0nbEOwOQLMhaR-Ea9nOUXrGso47Q0OigCLcBGAsYHQ/s776/absol.png" );
+    const texture2 = new THREE.TextureLoader().load( "https://i.pinimg.com/originals/20/1c/8b/201c8bb923fa4d5088be7f63c0649585.jpg" );
+    const texture3 = new THREE.TextureLoader().load( "https://img.elo7.com.br/product/zoom/14828CC/mega-charizard-x-garra-do-dragao-geek.jpg" );
+  
+
     const geometry = new THREE.BoxGeometry(1, 1, 1);
-    const material = new THREE.MeshBasicMaterial({color: 0x00ff00, wireframe: true});
+    const geometry2 = new THREE.PlaneGeometry( 1, 1 );
+    const geometry3 = new THREE.BoxGeometry(1, 0.5, 1);
+    const material = new THREE.MeshBasicMaterial( {map: texture} );
+    const material2 = new THREE.MeshBasicMaterial( {map: texture} );
+    const material3 = new THREE.MeshBasicMaterial( {map: texture} );
     this.cube = new THREE.Mesh(geometry, material);
-    this.scene.add(this.cube);
+    this.cube.position.set(2, 0, 0);
+    this.cube2 = new THREE.Mesh(geometry2, material2);
+    this.cube2.position.set(-2, 0, 0);
+    this.cube3 = new THREE.Mesh(geometry3, material3);
+    const group = new THREE.Group()
+    group.add(this.cube);
+    group.add(this.cube2);
+    group.add(this.cube3);
+    this.scene.add(group);
 
     const controls = new OrbitControls(this.camera, this.renderer.domElement);
     controls.target.set( 0, 0.5, 0 );
