@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import {ElementRef, Injectable, NgZone, OnDestroy} from '@angular/core';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { FirstPersonControls } from 'three/examples/jsm/controls/FirstPersonControls';
+import { MOUSE } from 'three';
 
 @Injectable({providedIn: 'root'})
 export class EngineService implements OnDestroy {
@@ -14,7 +16,11 @@ export class EngineService implements OnDestroy {
   private cube2: THREE.Mesh;
   private cube3: THREE.Mesh;
 
+  private clock = new THREE.Clock();
+
   private frameId: number = null;
+
+  private controls: FirstPersonControls;
 
   public constructor(private ngZone: NgZone) {
   }
@@ -40,8 +46,9 @@ export class EngineService implements OnDestroy {
     this.scene = new THREE.Scene();
 
     this.camera = new THREE.PerspectiveCamera(
-      75, window.innerWidth / window.innerHeight, 0.1, 1000
+      75, window.innerWidth / window.innerHeight, 1, 10000
     );
+    //this.camera.position.z = 5;
     this.camera.position.z = 5;
     this.scene.add(this.camera);
 
@@ -52,8 +59,8 @@ export class EngineService implements OnDestroy {
 
     //const texture = new THREE.TextureLoader().load( "assets/textures/yveltal.png" );
     const texture = new THREE.TextureLoader().load( "https://1.bp.blogspot.com/-Amtf96EIKqE/YNIfb-CgJkI/AAAAAAAATlo/X0nbEOwOQLMhaR-Ea9nOUXrGso47Q0OigCLcBGAsYHQ/s776/absol.png" );
-    const texture2 = new THREE.TextureLoader().load( "https://i.pinimg.com/originals/20/1c/8b/201c8bb923fa4d5088be7f63c0649585.jpg" );
-    const texture3 = new THREE.TextureLoader().load( "https://img.elo7.com.br/product/zoom/14828CC/mega-charizard-x-garra-do-dragao-geek.jpg" );
+    //const texture2 = new THREE.TextureLoader().load( "https://i.pinimg.com/originals/20/1c/8b/201c8bb923fa4d5088be7f63c0649585.jpg" );
+    //const texture3 = new THREE.TextureLoader().load( "https://img.elo7.com.br/product/zoom/14828CC/mega-charizard-x-garra-do-dragao-geek.jpg" );
   
 
     const geometry = new THREE.BoxGeometry(1, 1, 1);
@@ -73,11 +80,17 @@ export class EngineService implements OnDestroy {
     group.add(this.cube3);
     this.scene.add(group);
 
-    const controls = new OrbitControls(this.camera, this.renderer.domElement);
-    controls.target.set( 0, 0.5, 0 );
-		controls.update();
-		controls.enablePan = false;
-  	controls.enableDamping = true;
+    // this.controls = new FirstPersonControls(this.camera, document.getElementById('FPS'));
+    this.controls = new FirstPersonControls(this.camera, this.renderer.domElement);
+    this.controls.activeLook = true;
+    this.controls.movementSpeed = 1;
+		this.controls.lookSpeed = 0.1;
+    //this.controls.lookAt()
+    console.log(this.controls);
+    //controls.target.set( 0, 0.5, 0 );
+	//	controls.update();
+	//	controls.enablePan = false;
+  	//controls.enableDamping = true;
 
   }
 
@@ -106,6 +119,7 @@ export class EngineService implements OnDestroy {
 
     //this.cube.rotation.x += 0.01;
     //this.cube.rotation.y += 0.01;
+    this.controls.update(this.clock.getDelta());
     this.renderer.render(this.scene, this.camera);
   }
 
