@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {ElementRef, Injectable, NgZone, OnDestroy} from '@angular/core';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { FirstPersonControls } from 'three/examples/jsm/controls/FirstPersonControls';
-import { MOUSE } from 'three';
+import { Vector2, Vector3 } from 'three';
 
 @Injectable({providedIn: 'root'})
 export class EngineService implements OnDestroy {
@@ -18,6 +18,9 @@ export class EngineService implements OnDestroy {
 
   private clock = new THREE.Clock();
 
+  private raycaster = new THREE.Raycaster();
+  private mouse = new THREE.Vector2();
+
   private frameId: number = null;
 
   private controls: FirstPersonControls;
@@ -29,6 +32,17 @@ export class EngineService implements OnDestroy {
     if (this.frameId != null) {
       cancelAnimationFrame(this.frameId);
     }
+  }
+
+  public onMouseMove( event ) {
+
+    // calculate mouse position in normalized device coordinates
+    // (-1 to +1) for both components
+    this.mouse = new Vector2;
+    //console.log(( event.clientX / window.innerWidth ) * 2 - 1);
+    this.mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
+    this.mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
+  
   }
 
   public createScene(canvas: ElementRef<HTMLCanvasElement>): void {
@@ -59,7 +73,7 @@ export class EngineService implements OnDestroy {
 
     //const texture = new THREE.TextureLoader().load( "assets/textures/yveltal.png" );
     const texture = new THREE.TextureLoader().load( "https://1.bp.blogspot.com/-Amtf96EIKqE/YNIfb-CgJkI/AAAAAAAATlo/X0nbEOwOQLMhaR-Ea9nOUXrGso47Q0OigCLcBGAsYHQ/s776/absol.png" );
-    //const texture2 = new THREE.TextureLoader().load( "https://i.pinimg.com/originals/20/1c/8b/201c8bb923fa4d5088be7f63c0649585.jpg" );
+    //const texture = new THREE.TextureLoader().load( 'https://lh3.googleusercontent.com/TZ6FUtCv6aCmDNyW52ln30Wttsd4skeXKw252Jb0xZVaewjlFwXGFD8Hcj9_vjCT7VN6KZFXHcTQoefkZOcLZM7simvRHAA60l4q=s0' );
     //const texture3 = new THREE.TextureLoader().load( "https://img.elo7.com.br/product/zoom/14828CC/mega-charizard-x-garra-do-dragao-geek.jpg" );
   
 
@@ -74,19 +88,21 @@ export class EngineService implements OnDestroy {
     this.cube2 = new THREE.Mesh(geometry2, material2);
     this.cube2.position.set(-2, 0, 0);
     this.cube3 = new THREE.Mesh(geometry3, material3);
-    const group = new THREE.Group()
-    group.add(this.cube);
-    group.add(this.cube2);
-    group.add(this.cube3);
-    this.scene.add(group);
+    //const group = new THREE.Group()
+    //group.add(this.cube2);
+    //group.add(this.cube3);
+   // this.scene.add(group);
+    this.scene.add(this.cube);
+    this.scene.add(this.cube2);
+    this.scene.add(this.cube3);
 
     // this.controls = new FirstPersonControls(this.camera, document.getElementById('FPS'));
     this.controls = new FirstPersonControls(this.camera, this.renderer.domElement);
     this.controls.activeLook = true;
     this.controls.movementSpeed = 1;
 		this.controls.lookSpeed = 0.1;
+    this.controls.heightCoef = 0;
     //this.controls.lookAt()
-    console.log(this.controls);
     //controls.target.set( 0, 0.5, 0 );
 	//	controls.update();
 	//	controls.enablePan = false;
@@ -109,6 +125,8 @@ export class EngineService implements OnDestroy {
       window.addEventListener('resize', () => {
         this.resize();
       });
+
+      window.addEventListener( 'mousemove', this.onMouseMove, false );
     });
   }
 
@@ -119,6 +137,14 @@ export class EngineService implements OnDestroy {
 
     //this.cube.rotation.x += 0.01;
     //this.cube.rotation.y += 0.01;
+    this.raycaster.setFromCamera(this.mouse, this.camera)
+
+    const intersects = this.raycaster.intersectObjects( this.scene.children );
+
+    if(intersects.length > 0){
+      console.log(intersects[0].object)
+    }
+
     this.controls.update(this.clock.getDelta());
     this.renderer.render(this.scene, this.camera);
   }
