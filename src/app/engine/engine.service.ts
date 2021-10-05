@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {ElementRef, Injectable, NgZone, OnDestroy} from '@angular/core';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { FirstPersonControls } from 'three/examples/jsm/controls/FirstPersonControls';
-import { Vector2, Vector3 } from 'three';
+import { Raycaster, Vector2, Vector3 } from 'three';
 
 @Injectable({providedIn: 'root'})
 export class EngineService implements OnDestroy {
@@ -19,7 +19,10 @@ export class EngineService implements OnDestroy {
   private clock = new THREE.Clock();
 
   private raycaster = new THREE.Raycaster();
-  private mouse = new THREE.Vector2();
+  public mouse = new THREE.Vector2();
+  private mouse3d = new THREE.Vector3();
+
+  public mouseCoord;
 
   private frameId: number = null;
 
@@ -38,12 +41,15 @@ export class EngineService implements OnDestroy {
 
     // calculate mouse position in normalized device coordinates
     // (-1 to +1) for both components
-    this.mouse = new Vector2;
     //console.log(( event.clientX / window.innerWidth ) * 2 - 1);
     this.mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
     this.mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
-  
+
+    this.mouse3d = new THREE.Vector3(( event.clientX / window.innerWidth ) * 2 - 1, - ( event.clientY / window.innerHeight ) * 2 + 1, 0.5);
+    //this.controls.lookAt(this.mouse3d.x, this.mouse3d.y, this.mouse3d.z);
   }
+
+  
 
   public createScene(canvas: ElementRef<HTMLCanvasElement>): void {
     // The first step is to get the reference of the canvas element from our HTML document
@@ -84,6 +90,7 @@ export class EngineService implements OnDestroy {
     const material2 = new THREE.MeshBasicMaterial( {map: texture} );
     const material3 = new THREE.MeshBasicMaterial( {map: texture} );
     this.cube = new THREE.Mesh(geometry, material);
+    this.cube.name = 'cube1';
     this.cube.position.set(2, 0, 0);
     this.cube2 = new THREE.Mesh(geometry2, material2);
     this.cube2.position.set(-2, 0, 0);
@@ -95,13 +102,19 @@ export class EngineService implements OnDestroy {
     this.scene.add(this.cube);
     this.scene.add(this.cube2);
     this.scene.add(this.cube3);
+    this.scene.addEventListener('clickEvent', () => {
+      console.log('Click event dispatch');
+    })
 
     // this.controls = new FirstPersonControls(this.camera, document.getElementById('FPS'));
+    this.camera.lookAt(this.mouse3d.x, this.mouse3d.y, this.mouse3d.z);
     this.controls = new FirstPersonControls(this.camera, this.renderer.domElement);
     this.controls.activeLook = true;
+    this.controls.mouseDragOn = true;
     this.controls.movementSpeed = 1;
-		this.controls.lookSpeed = 0.1;
+		this.controls.lookSpeed = 0.2;
     this.controls.heightCoef = 0;
+    //this.controls.domElement.addEventListener( 'click', this.onMouseDown);
     //this.controls.lookAt()
     //controls.target.set( 0, 0.5, 0 );
 	//	controls.update();
@@ -122,11 +135,19 @@ export class EngineService implements OnDestroy {
         });
       }
 
+      //window.addEventListener( 'click', this.onMouseDown);
+
+      window.addEventListener('click', () => {
+        this.onMouseDown(event);
+      });
+
+      window.addEventListener('mousemove', () => {
+        this.onMouseMove(event);
+      });
+
       window.addEventListener('resize', () => {
         this.resize();
       });
-
-      window.addEventListener( 'mousemove', this.onMouseMove, false );
     });
   }
 
@@ -137,12 +158,14 @@ export class EngineService implements OnDestroy {
 
     //this.cube.rotation.x += 0.01;
     //this.cube.rotation.y += 0.01;
-    this.raycaster.setFromCamera(this.mouse, this.camera)
+    //this.raycaster.setFromCamera(this.mouse, this.camera)
+    //this.raycaster.far = 2;
 
     const intersects = this.raycaster.intersectObjects( this.scene.children );
 
     if(intersects.length > 0){
-      console.log(intersects[0].object)
+      console.log(intersects[0].object.name)
+      //console.log( this.scene.children )
     }
 
     this.controls.update(this.clock.getDelta());
@@ -153,9 +176,32 @@ export class EngineService implements OnDestroy {
     const width = window.innerWidth;
     const height = window.innerHeight;
 
+    console.log(this.camera);
+
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
 
     this.renderer.setSize(width, height);
+  }
+
+  public onMouseDown(event): void {
+    console.log('click')
+
+    this.mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
+    this.mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
+
+    console.log(this.mouse);
+
+    this.raycaster.setFromCamera(this.mouse, this.camera)
+    //this.raycaster.far = 2;
+
+    const intersects = this.raycaster.intersectObjects( this.scene.children );
+    console.log(intersects);
+
+    if(intersects.length > 0) {
+      console.log(intersects[0]);
+    }
+    this.controls.object.position.set(intersects[0].object.position.x, intersects[0].object.position.y, intersects[0].object.position.z + 2);
+    //this.controls.lookAt(intersects[0].object.position.x, intersects[0].object.position.y, intersects[0].object.position.z)
   }
 }
