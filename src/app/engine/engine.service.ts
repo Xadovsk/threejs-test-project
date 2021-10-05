@@ -28,6 +28,8 @@ export class EngineService implements OnDestroy {
 
   private controls: FirstPersonControls;
 
+  private nfts: Map<string, string>;
+
   public constructor(private ngZone: NgZone) {
   }
 
@@ -54,6 +56,7 @@ export class EngineService implements OnDestroy {
   public createScene(canvas: ElementRef<HTMLCanvasElement>): void {
     // The first step is to get the reference of the canvas element from our HTML document
     this.canvas = canvas.nativeElement;
+    this.nfts = new Map;
 
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
@@ -90,11 +93,13 @@ export class EngineService implements OnDestroy {
     const material2 = new THREE.MeshBasicMaterial( {map: texture} );
     const material3 = new THREE.MeshBasicMaterial( {map: texture} );
     this.cube = new THREE.Mesh(geometry, material);
-    this.cube.name = 'cube1';
+    this.cube.name = '15856337856917357433264578137314620566549072045013887703133171381486512766977';
     this.cube.position.set(2, 0, 0);
     this.cube2 = new THREE.Mesh(geometry2, material2);
+    this.cube2.name = '15856337856917357433264578137314620566549072045013887703133171384785047650305';
     this.cube2.position.set(-2, 0, 0);
     this.cube3 = new THREE.Mesh(geometry3, material3);
+    this.cube3.name = '15856337856917357433264578137314620566549072045013887703133171388083582533633';
     //const group = new THREE.Group()
     //group.add(this.cube2);
     //group.add(this.cube3);
@@ -102,9 +107,9 @@ export class EngineService implements OnDestroy {
     this.scene.add(this.cube);
     this.scene.add(this.cube2);
     this.scene.add(this.cube3);
-    this.scene.addEventListener('clickEvent', () => {
-      console.log('Click event dispatch');
-    })
+    this.nfts.set(this.cube.name, '15856337856917357433264578137314620566549072045013887703133171381486512766977');
+    this.nfts.set(this.cube2.name, '15856337856917357433264578137314620566549072045013887703133171384785047650305');
+    this.nfts.set(this.cube3.name, '15856337856917357433264578137314620566549072045013887703133171388083582533633');
 
     // this.controls = new FirstPersonControls(this.camera, document.getElementById('FPS'));
     this.camera.lookAt(this.mouse3d.x, this.mouse3d.y, this.mouse3d.z);
@@ -190,18 +195,37 @@ export class EngineService implements OnDestroy {
     this.mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
     this.mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
 
-    console.log(this.mouse);
+    //console.log(this.mouse);
 
     this.raycaster.setFromCamera(this.mouse, this.camera)
     //this.raycaster.far = 2;
 
     const intersects = this.raycaster.intersectObjects( this.scene.children );
-    console.log(intersects);
+    //console.log(intersects);
 
     if(intersects.length > 0) {
-      console.log(intersects[0]);
+      //console.log(intersects[0]);
     }
     this.controls.object.position.set(intersects[0].object.position.x, intersects[0].object.position.y, intersects[0].object.position.z + 2);
+    this.controls.lookAt(intersects[0].object.position.x, intersects[0].object.position.y, intersects[0].object.position.z);
+    let nftDiv = document.getElementById('nft');
+    nftDiv.setAttribute('style', 'display: block;');
+    if(document.getElementById('nft-card')) {
+      document.getElementById('nft-card').remove();
+    }
+    let nftElement = document.createElement('nft-card')
+    nftElement.setAttribute('tokenId', intersects[0].object.name)
+    nftElement.setAttribute('contractAddress', "0x495f947276749Ce646f68AC8c248420045cb7b5e")
+    nftElement.setAttribute('vertical', '')
+    nftElement.setAttribute('id', 'nft-card')
+    nftDiv.appendChild(nftElement);
+    this.controlsActivation(false);
+    console.log(intersects[0].object.name)
     //this.controls.lookAt(intersects[0].object.position.x, intersects[0].object.position.y, intersects[0].object.position.z)
+  }
+
+  public controlsActivation(active: boolean): void {
+    this.controls.activeLook = active;
+    this.controls.enabled = active;
   }
 }
