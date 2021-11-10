@@ -1,0 +1,11 @@
+Model Information:
+* title:	Snake + motions
+* source:	https://sketchfab.com/3d-models/snake-motions-4bb70c73d46e4b2cbb4529a3db5064b3
+* author:	Aram Firozy (https://sketchfab.com/www.majed.mohamadi)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Snake + motions" (https://sketchfab.com/3d-models/snake-motions-4bb70c73d46e4b2cbb4529a3db5064b3) by Aram Firozy (https://sketchfab.com/www.majed.mohamadi) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
