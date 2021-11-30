@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {ElementRef, Injectable, NgZone, OnDestroy} from '@angular/core';
+import { FontLoader, TextGeometry } from 'three';
 
 @Injectable({providedIn: 'root'})
 export class EngineService implements OnDestroy {
@@ -25,6 +26,9 @@ export class EngineService implements OnDestroy {
   public createScene(canvas: ElementRef<HTMLCanvasElement>): void {
     // The first step is to get the reference of the canvas element from our HTML document
     this.canvas = canvas.nativeElement;
+    let group = new THREE.Group();
+				group.position.y = 100;
+
 
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
@@ -37,20 +41,39 @@ export class EngineService implements OnDestroy {
     this.scene = new THREE.Scene();
 
     this.camera = new THREE.PerspectiveCamera(
-      75, window.innerWidth / window.innerHeight, 0.1, 1000
+      30, window.innerWidth / window.innerHeight, 1, 1500
     );
-    this.camera.position.z = 5;
+    this.camera.position.set( 0, 0, 100 );
     this.scene.add(this.camera);
 
     // soft white light
     this.light = new THREE.AmbientLight(0x404040);
     this.light.position.z = 10;
     this.scene.add(this.light);
+    let jsonFile;
 
+    const loader = new FontLoader();
+				loader.load( '/assets/font.typeface.json', ( font: THREE.Font ) => {
+          let textGeo = new TextGeometry( 'TESTE', {
+            font: font,
+            size: 10,
+            height: 5,
+          } );
+          let material = new THREE.MeshBasicMaterial( {
+                                               color      : '#FFFFFF',
+                                               side       : THREE.DoubleSide
+                                             } );
+          let mesh = new THREE.Mesh( textGeo, material );
+          //this.camera.lookAt(mesh.position)
+          this.scene.add( mesh );
+				} );
+   // const json = JSON.parse( jsonFile ); // you have to parse the data so it becomes a JS object 
+
+    const material = new THREE.MeshLambertMaterial({color: 0x00ff00});
     const geometry = new THREE.BoxGeometry(1, 1, 1);
-    const material = new THREE.MeshBasicMaterial({color: 0x00ff00});
+    
     this.cube = new THREE.Mesh(geometry, material);
-    this.scene.add(this.cube);
+    //this.scene.add(group);
 
   }
 
