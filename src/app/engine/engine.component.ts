@@ -10,12 +10,18 @@ export class EngineComponent implements OnInit {
   @ViewChild('rendererCanvas', {static: true})
   public rendererCanvas: ElementRef<HTMLCanvasElement>;
 
+  public userInput;
+
   public constructor(private engServ: EngineService) {
   }
 
   public ngOnInit(): void {
     this.engServ.createScene(this.rendererCanvas);
     this.engServ.animate();
+  }
+
+  text(event) {
+    this.engServ.createText(this.userInput);
   }
 
 }

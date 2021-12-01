@@ -9,6 +9,7 @@ export class EngineService implements OnDestroy {
   private camera: THREE.PerspectiveCamera;
   private scene: THREE.Scene;
   private light: THREE.AmbientLight;
+  private mesh;
 
   private cube: THREE.Mesh;
 
@@ -63,9 +64,9 @@ export class EngineService implements OnDestroy {
                                                color      : '#FFFFFF',
                                                side       : THREE.DoubleSide
                                              } );
-          let mesh = new THREE.Mesh( textGeo, material );
+          this.mesh = new THREE.Mesh( textGeo, material );
           //this.camera.lookAt(mesh.position)
-          this.scene.add( mesh );
+          this.scene.add( this.mesh );
 				} );
    // const json = JSON.parse( jsonFile ); // you have to parse the data so it becomes a JS object 
 
@@ -113,5 +114,24 @@ export class EngineService implements OnDestroy {
     this.camera.updateProjectionMatrix();
 
     this.renderer.setSize(width, height);
+  }
+
+  public createText(text: string) {
+    this.scene.remove(this.mesh)
+    const loader = new FontLoader();
+				loader.load( '/assets/font.typeface.json', ( font: THREE.Font ) => {
+          let textGeo = new TextGeometry( text, {
+            font: font,
+            size: 10,
+            height: 5,
+          } );
+          let material = new THREE.MeshBasicMaterial( {
+                                               color      : '#FFFFFF',
+                                               side       : THREE.DoubleSide
+                                             } );
+          this.mesh = new THREE.Mesh( textGeo, material );
+          //this.camera.lookAt(mesh.position)
+          this.scene.add( this.mesh );
+				} );
   }
 }

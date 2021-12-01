@@ -1,3 +1,7 @@
 <div class="engine-wrapper">
   <canvas #rendererCanvas id="renderCanvas"></canvas>
+  <div style="position: absolute; display: flex; top: 0; width: 100vw; height: 100vh; flex-direction: column;">
+    <input [(ngModel)]="userInput" style="width: 70vw; margin: 80vh auto 0 auto;" type="text" id="name" name="name">
+    <button (click)="this.text($event)" style="margin: 0 auto auto auto; width: 200px;" >Save</button>
+  </div>
 </div>
