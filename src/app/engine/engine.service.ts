@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import {ElementRef, Injectable, NgZone, OnDestroy} from '@angular/core';
-import { FontLoader, TextGeometry } from 'three';
+import { FontLoader, TextBufferGeometry, TextGeometry, TextureLoader } from 'three';
+import { BloomPass } from 'three/examples/jsm/postprocessing/BloomPass'
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer'
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass'
 
 @Injectable({providedIn: 'root'})
 export class EngineService implements OnDestroy {
@@ -9,7 +12,9 @@ export class EngineService implements OnDestroy {
   private camera: THREE.PerspectiveCamera;
   private scene: THREE.Scene;
   private light: THREE.AmbientLight;
-  private mesh;
+  private mesh: THREE.Mesh;
+  private composer: EffectComposer;
+  private material: THREE.MeshLambertMaterial;
 
   private cube: THREE.Mesh;
 
@@ -48,32 +53,33 @@ export class EngineService implements OnDestroy {
     this.scene.add(this.camera);
 
     // soft white light
-    this.light = new THREE.AmbientLight(0x404040);
-    this.light.position.z = 10;
+    this.light = new THREE.AmbientLight(0xffffff, 0.5);
+    this.light.position.z = -10;
     this.scene.add(this.light);
-    let jsonFile;
+    const light = new THREE.PointLight( new THREE.Color('white'), 10, 100 );
+    light.castShadow = true;
+    light.position.set( 0, 0, 10 );
+    this.scene.add( light );
+    const texture = new TextureLoader().load('/assets/textures/neontest.jpg')
+    //texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    const renderScene = new RenderPass( this.scene, this.camera );
 
-    const loader = new FontLoader();
-				loader.load( '/assets/font.typeface.json', ( font: THREE.Font ) => {
-          let textGeo = new TextGeometry( 'TESTE', {
-            font: font,
-            size: 10,
-            height: 5,
-          } );
-          let material = new THREE.MeshBasicMaterial( {
-                                               color      : '#FFFFFF',
-                                               side       : THREE.DoubleSide
-                                             } );
-          this.mesh = new THREE.Mesh( textGeo, material );
-          //this.camera.lookAt(mesh.position)
-          this.scene.add( this.mesh );
-				} );
+    const bloomPass = new BloomPass( 1.5, 4, 85 );
+
+				this.composer = new EffectComposer( this.renderer );
+				this.composer.addPass( renderScene );
+				this.composer.addPass( bloomPass );
+        this.material = new THREE.MeshLambertMaterial( {
+          map: texture,
+        } );
    // const json = JSON.parse( jsonFile ); // you have to parse the data so it becomes a JS object 
 
     const material = new THREE.MeshLambertMaterial({color: 0x00ff00});
     const geometry = new THREE.BoxGeometry(1, 1, 1);
     
     this.cube = new THREE.Mesh(geometry, material);
+    this.createText('TESTE')
     //this.scene.add(group);
 
   }
@@ -104,6 +110,7 @@ export class EngineService implements OnDestroy {
     this.cube.rotation.x += 0.01;
     this.cube.rotation.y += 0.01;
     this.renderer.render(this.scene, this.camera);
+    this.composer.render()
   }
 
   public resize(): void {
@@ -120,16 +127,15 @@ export class EngineService implements OnDestroy {
     this.scene.remove(this.mesh)
     const loader = new FontLoader();
 				loader.load( '/assets/font.typeface.json', ( font: THREE.Font ) => {
-          let textGeo = new TextGeometry( text, {
+          let textGeo = new TextBufferGeometry( text, {
             font: font,
             size: 10,
             height: 5,
           } );
-          let material = new THREE.MeshBasicMaterial( {
-                                               color      : '#FFFFFF',
-                                               side       : THREE.DoubleSide
-                                             } );
-          this.mesh = new THREE.Mesh( textGeo, material );
+          textGeo.computeBoundingBox();
+          textGeo.center();
+          this.mesh = new THREE.Mesh( textGeo, this.material );
+          this.mesh.castShadow = true;
           //this.camera.lookAt(mesh.position)
           this.scene.add( this.mesh );
 				} );
