@@ -7,6 +7,9 @@ import {UiInfobarTopComponent} from './ui/ui-infobar-top/ui-infobar-top.componen
 import {UiSidebarLeftComponent} from './ui/ui-sidebar-left/ui-sidebar-left.component';
 import {UiSidebarRightComponent} from './ui/ui-sidebar-right/ui-sidebar-right.component';
 import {UiComponent} from './ui/ui.component';
+import { HttpClientModule } from '@angular/common/http';
+import { AppRoutingModule } from './app-routing.module';
+import { ImageDownloadComponent } from './image-download/image-download.component';
 
 @NgModule({
   declarations: [
@@ -16,10 +19,13 @@ import {UiComponent} from './ui/ui.component';
     UiInfobarBottomComponent,
     UiInfobarTopComponent,
     UiSidebarLeftComponent,
-    UiSidebarRightComponent
+    UiSidebarRightComponent,
+    ImageDownloadComponent
   ],
   imports: [
-    BrowserModule
+    BrowserModule,
+    HttpClientModule,
+    AppRoutingModule,
   ],
   providers: [],
   bootstrap: [

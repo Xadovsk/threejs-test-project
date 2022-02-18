@@ -14,9 +14,4 @@ export class UiInfobarBottomComponent implements OnInit {
   public ngOnInit(): void {
   }
 
-  public backButton() {
-    document.getElementById('nft').setAttribute('style', 'display: none;')
-    this.engine.controlsActivation(true);
-  }
-
 }

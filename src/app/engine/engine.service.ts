@@ -1,9 +1,14 @@
 import * as THREE from 'three';
 import {ElementRef, Injectable, NgZone, OnDestroy} from '@angular/core';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
-import { FirstPersonControls } from 'three/examples/jsm/controls/FirstPersonControls';
-import { Raycaster, Vector2, Vector3 } from 'three';
-import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
+import { BufferGeometryUtils, Color, FontLoader, MeshBasicMaterial, TextBufferGeometry, TextGeometry, TextureLoader, Vector3 } from 'three';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass'
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer'
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass'
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass';
+import { RequestService } from './requests.service';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
+
+let TWEEN = require('@tweenjs/tween.js');
 
 @Injectable({providedIn: 'root'})
 export class EngineService implements OnDestroy {
@@ -12,180 +17,24 @@ export class EngineService implements OnDestroy {
   private camera: THREE.PerspectiveCamera;
   private scene: THREE.Scene;
   private light: THREE.AmbientLight;
-  private fog: THREE.Fog;
+  private mesh: THREE.Mesh;
+  private composer: EffectComposer;
+  private material: THREE.MeshLambertMaterial;
+  private UnrealBloomPass: UnrealBloomPass;
+  private renderScene: RenderPass;
+  private copyPass: ShaderPass;
+  private smokeParticles = [];
+  private spheres: THREE.Mesh[];
 
   private cube: THREE.Mesh;
-  private cube2: THREE.Mesh;
-  private cube3: THREE.Mesh;
-
-  // Teleport Meshes
-  private teleport1: THREE.Mesh;
-  private teleport2: THREE.Mesh;
-  private teleport3: THREE.Mesh;
-  private teleport4: THREE.Mesh;
-
-  //Room Meshes
-  private room: THREE.Mesh;
-  private room2: THREE.Mesh;
-  private room3: THREE.Mesh;
-  private room4: THREE.Mesh;
-
-  private travelPlayer: boolean;
-  private travelTarget: THREE.Vector3;
-
-  private clock = new THREE.Clock();
-
-  private raycaster = new THREE.Raycaster();
-  public mouse = new THREE.Vector2();
-  private mouse3d = new THREE.Vector3();
-
-  public mouseCoord;
+  private head: THREE.Mesh;
+  private picapau: THREE.Mesh;
+  private morph: number = 0;
+  private shouldMorphHead;
 
   private frameId: number = null;
 
-  private controls: FirstPersonControls;
-
-  private nfts: Map<string, string>;
-
-  private cloudParticles = [];
-
-  private vertexShader = `varying vec2 vUv; 
-  void main()
-  {
-      vUv = uv;
-  
-      vec4 mvPosition = modelViewMatrix * vec4(position, 1.0 );
-      gl_Position = projectionMatrix * mvPosition;
-  }`;
-
-  private fragmentShader= `
-  #include <common>
-
-  uniform vec3 iResolution;
-  uniform float iTime;
-
-  const float cloudscale = 1.1;
-const float speed = 0.03;
-const float clouddark = 0.5;
-const float cloudlight = 0.3;
-const float cloudcover = 0.2;
-const float cloudalpha = 8.0;
-const float skytint = 0.5;
-const vec3 skycolour1 = vec3(0.2, 0.4, 0.6);
-const vec3 skycolour2 = vec3(0.4, 0.7, 1.0);
-
-const mat2 m = mat2( 1.6,  1.2, -1.2,  1.6 );
-
-vec2 hash( vec2 p ) {
-	p = vec2(dot(p,vec2(127.1,311.7)), dot(p,vec2(269.5,183.3)));
-	return -1.0 + 2.0*fract(sin(p)*43758.5453123);
-}
-
-float noise( in vec2 p ) {
-    const float K1 = 0.366025404; // (sqrt(3)-1)/2;
-    const float K2 = 0.211324865; // (3-sqrt(3))/6;
-	vec2 i = floor(p + (p.x+p.y)*K1);	
-    vec2 a = p - i + (i.x+i.y)*K2;
-    vec2 o = (a.x>a.y) ? vec2(1.0,0.0) : vec2(0.0,1.0); //vec2 of = 0.5 + 0.5*vec2(sign(a.x-a.y), sign(a.y-a.x));
-    vec2 b = a - o + K2;
-	vec2 c = a - 1.0 + 2.0*K2;
-    vec3 h = max(0.5-vec3(dot(a,a), dot(b,b), dot(c,c) ), 0.0 );
-	vec3 n = h*h*h*h*vec3( dot(a,hash(i+0.0)), dot(b,hash(i+o)), dot(c,hash(i+1.0)));
-    return dot(n, vec3(70.0));	
-}
-
-float fbm(vec2 n) {
-	float total = 0.0, amplitude = 0.1;
-	for (int i = 0; i < 7; i++) {
-		total += noise(n) * amplitude;
-		n = m * n;
-		amplitude *= 0.4;
-	}
-	return total;
-}
-
-// -----------------------------------------------
-
-void mainImage( out vec4 fragColor, in vec2 fragCoord ) {
-    vec2 p = fragCoord.xy / iResolution.xy;
-	vec2 uv = p*vec2(iResolution.x/iResolution.y,1.0);    
-    float time = iTime * speed;
-    float q = fbm(uv * cloudscale * 0.5);
-    
-    //ridged noise shape
-	float r = 0.0;
-	uv *= cloudscale;
-    uv -= q - time;
-    float weight = 0.8;
-    for (int i=0; i<8; i++){
-		r += abs(weight*noise( uv ));
-        uv = m*uv + time;
-		weight *= 0.7;
-    }
-    
-    //noise shape
-	float f = 0.0;
-    uv = p*vec2(iResolution.x/iResolution.y,1.0);
-	uv *= cloudscale;
-    uv -= q - time;
-    weight = 0.7;
-    for (int i=0; i<8; i++){
-		f += weight*noise( uv );
-        uv = m*uv + time;
-		weight *= 0.6;
-    }
-    
-    f *= r + f;
-    
-    //noise colour
-    float c = 0.0;
-    time = iTime * speed * 2.0;
-    uv = p*vec2(iResolution.x/iResolution.y,1.0);
-	uv *= cloudscale*2.0;
-    uv -= q - time;
-    weight = 0.4;
-    for (int i=0; i<7; i++){
-		c += weight*noise( uv );
-        uv = m*uv + time;
-		weight *= 0.6;
-    }
-    
-    //noise ridge colour
-    float c1 = 0.0;
-    time = iTime * speed * 3.0;
-    uv = p*vec2(iResolution.x/iResolution.y,1.0);
-	uv *= cloudscale*3.0;
-    uv -= q - time;
-    weight = 0.4;
-    for (int i=0; i<7; i++){
-		c1 += abs(weight*noise( uv ));
-        uv = m*uv + time;
-		weight *= 0.6;
-    }
-	
-    c += c1;
-    
-    vec3 skycolour = mix(skycolour2, skycolour1, p.y);
-    vec3 cloudcolour = vec3(1.1, 1.1, 0.9) * clamp((clouddark + cloudlight*c), 0.0, 1.0);
-   
-    f = cloudcover + cloudalpha*f*r;
-    
-    vec3 result = mix(skycolour, clamp(skytint * skycolour + cloudcolour, 0.0, 1.0), clamp(f + c, 0.0, 1.0));
-    
-	fragColor = vec4( result, 1.0 );
-}
-
-  void main() {
-    mainImage(gl_FragColor, gl_FragCoord.xy);
-  }
-  `;
-
-private uniforms = {
-  iTime: { value: 0 },
-  iResolution:  { value: new THREE.Vector3() },
-};
-
-  public constructor(private ngZone: NgZone) {
+  public constructor(private ngZone: NgZone, private request: RequestService) {
   }
 
   public ngOnDestroy(): void {
@@ -194,216 +43,134 @@ private uniforms = {
     }
   }
 
-  public onMouseMove( event ) {
-
-    // calculate mouse position in normalized device coordinates
-    // (-1 to +1) for both components
-    //console.log(( event.clientX / window.innerWidth ) * 2 - 1);
-    this.mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
-    this.mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
-
-    this.mouse3d = new THREE.Vector3(( event.clientX / window.innerWidth ) * 2 - 1, - ( event.clientY / window.innerHeight ) * 2 + 1, 0.5);
-    //this.controls.lookAt(this.mouse3d.x, this.mouse3d.y, this.mouse3d.z);
-  }
-
-  
-
   public createScene(canvas: ElementRef<HTMLCanvasElement>): void {
     // The first step is to get the reference of the canvas element from our HTML document
+    console.log(TWEEN)
     this.canvas = canvas.nativeElement;
-    this.nfts = new Map;
-    this.uniforms.iResolution.value.set(canvas.nativeElement.width, canvas.nativeElement.height, 1);
-
+    let group = new THREE.Group();
+				group.position.y = 100;
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
       alpha: true,    // transparent background
-      antialias: true // smooth edges
+      antialias: true, // smooth edges
+      preserveDrawingBuffer: true
     });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.spheres = []
 
     // create the scene
     this.scene = new THREE.Scene();
-    this.fog = new THREE.Fog('white');
 
     this.camera = new THREE.PerspectiveCamera(
-      75, window.innerWidth / window.innerHeight, 1, 10000
+      30, window.innerWidth / window.innerHeight, 1, 1500
     );
-    //this.camera.position.z = 5;
-    this.camera.position.z = 5;
+    this.camera.position.set( 0, 0, 10 );
     this.scene.add(this.camera);
 
-    const loader = new FBXLoader();
-
-loader.load( 'assets/models/rooms-and-gate.fbx',(fbx) => {
-  fbx.position.set(0, 0, 0);
-  fbx.scale.set(.001,.001,.001)
-
-	this.scene.add( fbx );
-
-}, undefined, function ( error ) {
-
-	console.error( error );
-
-} );
-
     // soft white light
-    this.light = new THREE.AmbientLight(0x404040);
-    this.light.position.z = 10;
+    this.light = new THREE.AmbientLight(0xffffff, 5);
+    this.light.position.z = 3;
+    this.light.position.y = 3;
     this.scene.add(this.light);
+    const light = new THREE.PointLight( new THREE.Color('white'), 2 );
+    light.castShadow = true;
+    light.position.set( 0, 3, 3 );
+    this.scene.add( light );
+    const texture = new TextureLoader().load('/assets/textures/neontest.jpg')
+    //texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+   // const json = JSON.parse( jsonFile ); // you have to parse the data so it becomes a JS object 
 
-    let directionalLight = new THREE.DirectionalLight(0xff8c19);
-    directionalLight.position.set(0,0,1);
-    this.scene.add(directionalLight);
-    /* let orangeLight = new THREE.PointLight(0xcc6600,50,450,1.7);
-    orangeLight.position.set(200,300,100);
-    this.scene.add(orangeLight);
-    let redLight = new THREE.PointLight(0xd8547e,50,450,1.7);
-    redLight.position.set(100,300,100);
-    this.scene.add(redLight);
-    let blueLight = new THREE.PointLight(0x3677ac,50,450,1.7);
-    blueLight.position.set(300,300,200);
-    this.scene.add(blueLight); */
+    const material = new THREE.MeshLambertMaterial({color: 0x00ff00});
+    const geometry = new THREE.BoxGeometry(10, 10, 1);
+    
+    this.cube = new THREE.Mesh(geometry, material);
+    this.cube.position.z=-10
+    this.scene.add(this.cube);
+    this.renderScene = new RenderPass( this.scene, this.camera );
+    this.renderScene.renderToScreen = true;
 
-    const texture2 = new THREE.TextureLoader().load( "assets/images/smoke-1.png" );
-    const texture = new THREE.TextureLoader().load( "https://1.bp.blogspot.com/-Amtf96EIKqE/YNIfb-CgJkI/AAAAAAAATlo/X0nbEOwOQLMhaR-Ea9nOUXrGso47Q0OigCLcBGAsYHQ/s776/absol.png" );
-    //const texture2 = new THREE.TextureLoader().load( 'https://lh3.googleusercontent.com/TZ6FUtCv6aCmDNyW52ln30Wttsd4skeXKw252Jb0xZVaewjlFwXGFD8Hcj9_vjCT7VN6KZFXHcTQoefkZOcLZM7simvRHAA60l4q=s0' );
-    //const texture3 = new THREE.TextureLoader().load( "https://img.elo7.com.br/product/zoom/14828CC/mega-charizard-x-garra-do-dragao-geek.jpg" );
-
-    const cloudGeo = new THREE.BoxGeometry(5000,5000);
-    const cloudMaterial = new THREE.MeshLambertMaterial({
-      map:texture2,
+    //Smoke
+    const smokeGeometry = new THREE.PlaneGeometry(30, 30)
+    const smokeMaterial = new THREE.MeshBasicMaterial({
+      map: new THREE.TextureLoader().load('/assets/textures/clouds.png'),
       transparent: true
     });
-
-    /* for(let p=0; p<50; p++) {
-      let cloud = new THREE.Mesh(cloudGeo, cloudMaterial);
-      cloud.position.set(
-        Math.random()*800 -400,
-        0,
-        Math.random()*-500-100
-      );
-      cloud.rotation.x = 0;
-      cloud.rotation.y = 0;
-      cloud.rotation.z = 0;
-      cloud.material.side = THREE.DoubleSide;
-      cloud.material.opacity = 0.55;
-      this.cloudParticles.push(cloud);
-      this.scene.add(cloud);
-    } */
-
-    //Skybox Texture
-    let materialArray = [];
-    let texture_ft = new THREE.TextureLoader().load( 'assets/images/DaylightBox_Back.bmp');
-    let texture_bk = new THREE.TextureLoader().load( 'assets/images/DaylightBox_Front.bmp');
-    let texture_up = new THREE.TextureLoader().load( 'assets/images/DaylightBox_Top.bmp');
-    let texture_dn = new THREE.TextureLoader().load( 'assets/images/DaylightBox_Bottom.bmp');
-    let texture_rt = new THREE.TextureLoader().load( 'assets/images/DaylightBox_Right.bmp');
-    let texture_lf = new THREE.TextureLoader().load( 'assets/images/DaylightBox_Left.bmp');
-  
-    materialArray.push(new THREE.MeshBasicMaterial( { map: texture_ft }));
-    materialArray.push(new THREE.MeshBasicMaterial( { map: texture_bk }));
-    materialArray.push(new THREE.MeshBasicMaterial( { map: texture_up }));
-    materialArray.push(new THREE.MeshBasicMaterial( { map: texture_dn }));
-    materialArray.push(new THREE.MeshBasicMaterial( { map: texture_rt }));
-    materialArray.push(new THREE.MeshBasicMaterial( { map: texture_lf }));
-    for (let i = 0; i < 6; i++) {
-      materialArray[i].side = THREE.BackSide;
-      materialArray[i].fog = false;
+    for (let i = 0; i < 150; i++) {
+      const smokeMesh = new THREE.Mesh(smokeGeometry, smokeMaterial)
+      smokeMesh.position.x = ( Math.random() - Math.random()) * 50 - 1
+      smokeMesh.position.z = 2
+      smokeMesh.position.y = ( Math.random() - Math.random()) * 100 - 10
+      smokeMesh.rotation.z = Math.random() * 1000 - 100
+      smokeMesh.material.opacity = 0.1
+      this.smokeParticles.push(smokeMesh);
+      //this.scene.add(smokeMesh)
     }
 
-    let skyboxGeo = new THREE.BoxGeometry( 10000, 10000, 10000);
-    let skybox = new THREE.Mesh( skyboxGeo, materialArray );
-    const materialFloor = new THREE.MeshBasicMaterial( {map: texture2} );
-    materialFloor.side = THREE.DoubleSide;
-    materialFloor.fog = false;
-    let floorGeo = new THREE.BoxGeometry( 10000, 1, 10000 );
-    let floor = new THREE.Mesh( floorGeo, materialFloor )
-    floor.position.set( 0, -2, 0)
-    this.scene.add( skybox );
-    this.scene.add(floor)
+    this.UnrealBloomPass = new UnrealBloomPass( new THREE.Vector2( window.innerWidth, window.innerHeight ), 1.5, 0.4, 0.85);
+    this.UnrealBloomPass.threshold = 0;
+    this.UnrealBloomPass.strength = .5;
+    this.UnrealBloomPass.radius = 0;
+    this.UnrealBloomPass.renderToScreen = true;
 
-    const geometry = new THREE.BoxGeometry(1, 1, 1);
-    const roomGeometry = new THREE.BoxGeometry(10, 10, 10);
-    const frameGeometry = new THREE.BoxGeometry(3, 5, 0.1);
-    const geometry3 = new THREE.BoxGeometry(1, 0.5, 1);
-    const simpleMaterial = new THREE.MeshBasicMaterial({ wireframe: true })
-    const colorMaterial = new THREE.MeshBasicMaterial({ color: new THREE.Color('black'), wireframe: true })
-    const material = new THREE.MeshBasicMaterial( {map: texture} );
-    material.side = THREE.DoubleSide;
-    const material2 = new THREE.MeshBasicMaterial( {map: texture} );
-    const material3 = new THREE.MeshBasicMaterial( {map: texture} );
+    //Head
+    const loader = new GLTFLoader();
+    loader.load( 'assets/models/Ciana.glb',(gltf) => {
+      gltf.scene.position.set(0, -15,0)
+      this.head = gltf.scene.children[0] as THREE.Mesh;
+      this.scene.add( gltf.scene );
+      console.log(this.head.geometry.isBufferGeometry);
+      this.head.morphTargetInfluences[0] = 1
+      this.head.visible = false;
+      const position = this.head.geometry.attributes.position;
+      const vector = new THREE.Vector3();
+      for ( let i = 0, l = position.count; i < l; i ++ ) {
+        vector.fromBufferAttribute( position, i );
+        vector.applyMatrix4( this.head.matrixWorld );
+        const sphere = new THREE.Mesh(new THREE.SphereGeometry(.006), new THREE.MeshStandardMaterial({color: new THREE.Color(0xffffff)}));
+        sphere.position.set(vector.x , vector.y - 15, vector.z)
+        this.scene.add(sphere)
+        this.spheres.push(sphere)
+        //console.log(vector); 
+      }
+      //this.head.morphTargetInfluences[0] = this.morph
+      const headMaterial = new THREE.MeshStandardMaterial;
+      headMaterial.wireframe = true;
+      headMaterial.color = new THREE.Color(0xFFFFFF);
+      (this.head.material as THREE.MeshStandardMaterial).wireframe = true;
 
-    //NFT gallery
-    this.cube = new THREE.Mesh(frameGeometry, material);
-    this.cube.name = '15856337856917357433264578137314620566549072045013887703133171381486512766977';
-    this.cube.position.set(10, -10, 5);
-    this.cube2 = new THREE.Mesh(frameGeometry, material2);
-    this.cube2.name = '15856337856917357433264578137314620566549072045013887703133171384785047650305';
-    this.cube2.position.set(-10, -10, 5);
-    this.cube3 = new THREE.Mesh(frameGeometry, material3);
-    this.cube3.name = '15856337856917357433264578137314620566549072045013887703133171388083582533633';
-    this.cube3.position.set(-10, -10, -15);
+    }, undefined, function ( error ) {
 
-    //Teleport creation
-    colorMaterial.side = THREE.DoubleSide;
-    this.teleport1 = new THREE.Mesh(geometry, simpleMaterial);
-    this.teleport1.name = 'teleport';
-    this.teleport1.position.set(10, 0, 10)
-    this.teleport2 = new THREE.Mesh(geometry, simpleMaterial);
-    this.teleport2.name = 'teleport';
-    this.teleport2.position.set(-10, 0, 10)
-    this.teleport3 = new THREE.Mesh(geometry, simpleMaterial);
-    this.teleport3.name = 'teleport';
-    this.teleport3.position.set(-10, 0, -10)
-    this.teleport4 = new THREE.Mesh(geometry, simpleMaterial);
-    this.teleport4.name = 'teleport';
-    this.teleport4.position.set(10, 0, -10)
+      console.error( error );
 
-    //Room creation
-    this.room = new THREE.Mesh(roomGeometry, colorMaterial);
-    this.room.position.set(10, -10, 10)
-    this.room2 = new THREE.Mesh(roomGeometry, colorMaterial);
-    this.room2.position.set(-10, -10, 10)
-    this.room3 = new THREE.Mesh(roomGeometry, colorMaterial);
-    this.room3.position.set(10, -10, -10)
-    this.room4 = new THREE.Mesh(roomGeometry, colorMaterial);
-    this.room4.position.set(-10, -10, -10)
-    //const group = new THREE.Group()
-    //group.add(this.cube2);
-    //group.add(this.cube3);
-   // this.scene.add(group);
-    //this.scene.fog = new THREE.Fog('white', 1,10);
-    //this.renderer.setClearColor(this.scene.fog.color);
-    this.scene.add(this.cube);
-    this.scene.add(this.cube2);
-    this.scene.add(this.cube3);
-    this.scene.add(this.teleport1);
-    this.scene.add(this.teleport2);
-    this.scene.add(this.teleport3);
-    this.scene.add(this.teleport4);
-    this.scene.add(this.room);
-    this.scene.add(this.room2);
-    this.scene.add(this.room3);
-    this.scene.add(this.room4);
-    this.nfts.set(this.cube.name, '15856337856917357433264578137314620566549072045013887703133171381486512766977');
-    this.nfts.set(this.cube2.name, '15856337856917357433264578137314620566549072045013887703133171384785047650305');
-    this.nfts.set(this.cube3.name, '15856337856917357433264578137314620566549072045013887703133171388083582533633');
+    } );
 
-    // this.controls = new FirstPersonControls(this.camera, document.getElementById('FPS'));
-    this.camera.lookAt(this.mouse3d.x, this.mouse3d.y, this.mouse3d.z);
-    this.controls = new FirstPersonControls(this.camera, this.renderer.domElement);
-    this.controls.activeLook = true;
-    this.controls.mouseDragOn = true;
-    this.controls.movementSpeed = 10;
-		this.controls.lookSpeed = 0.2;
-    this.controls.heightCoef = 0;
-    //this.controls.domElement.addEventListener( 'click', this.onMouseDown);
-    //this.controls.lookAt()
-    //controls.target.set( 0, 0.5, 0 );
-	//	controls.update();
-	//	controls.enablePan = false;
-  	//controls.enableDamping = true;
+    loader.load( 'assets/models/Ciana.glb',(gltf) => {
+      gltf.scene.position.set(2, -15,0)
+      this.picapau = gltf.scene.children[0] as THREE.Mesh;
+      this.scene.add( gltf.scene );
+      this.picapau.visible = false;
+      (this.picapau.material as THREE.MeshStandardMaterial).wireframe = true
 
+    }, undefined, function ( error ) {
+
+      console.error( error );
+
+    } );
+
+    /* this.copyPass = new ShaderPass( THREE.ShaderMaterial)
+    this.copyPass.renderToScreen = true; */
+
+		this.composer = new EffectComposer( this.renderer );
+		this.composer.addPass( this.renderScene );
+		this.composer.addPass( this.UnrealBloomPass );
+    //this.composer.addPass( this.copyPass );
+    this.composer.setSize(window.innerWidth, window.innerHeight);
+    this.composer.renderToScreen = true;
+    this.material = new THREE.MeshLambertMaterial( {
+      //map: texture,
+      color: new THREE.Color('blue')
+    } );
   }
 
   public animate(): void {
@@ -418,16 +185,6 @@ loader.load( 'assets/models/rooms-and-gate.fbx',(fbx) => {
         });
       }
 
-      //window.addEventListener( 'click', this.onMouseDown);
-
-      window.addEventListener('click', () => {
-        this.onMouseDown(event);
-      });
-
-      window.addEventListener('mousemove', () => {
-        this.onMouseMove(event);
-      });
-
       window.addEventListener('resize', () => {
         this.resize();
       });
@@ -439,42 +196,15 @@ loader.load( 'assets/models/rooms-and-gate.fbx',(fbx) => {
       this.render();
     });
 
-    /* this.cloudParticles.forEach(p => {
-      p.rotation.z -=0.001;
-    }); */
-    this.raycaster.setFromCamera(this.mouse, this.camera)
-    const intersects = this.raycaster.intersectObjects( this.scene.children );
+    TWEEN.update();
 
-    if(intersects.length > 0){
-      //console.log(intersects[0].object.name)
-      console.log(this.controls.object.position.distanceTo(intersects[0].object.position))
-      if(intersects[0].object.name === 'teleport')
-      if( this.controls.object.position.distanceTo(intersects[0].object.position) < 1) {
-        //this.controls.object.position.copy(intersects[0].point)
-        console.log(intersects[0].distance)
-        this.controls.object.position.set(this.controls.object.position.x, this.controls.object.position.y - 10, this.controls.object.position.z);
-      }
-      //console.log( this.scene.children )
-      
-    }
-
-    if (this.travelPlayer) {
-      this.controls.object.position.lerp( this.travelTarget, 0.1);
-      //console.log(this.controls.object.position.equals(this.travelTarget));
-      //console.log(this.travelTarget);
-      //this.controls.object.position === this.travelTarget ? this.travelPlayer = false : '';
-    }
-
-    this.uniforms.iTime.value += 0.1;
-    this.controls.update(this.clock.getDelta());
     this.renderer.render(this.scene, this.camera);
+    //this.composer.render( 0.05 )
   }
 
   public resize(): void {
     const width = window.innerWidth;
     const height = window.innerHeight;
-
-    console.log(this.camera);
 
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
@@ -482,42 +212,100 @@ loader.load( 'assets/models/rooms-and-gate.fbx',(fbx) => {
     this.renderer.setSize(width, height);
   }
 
-  public onMouseDown(event): void {
-    console.log('click')
+  public morphHead() {
+  /*   this.morph = this.morph + 0.1;
+    this.morph > 1 ? this.morph = 0 : '';
+    this.head.morphTargetInfluences[0] = this.morph */
+    
+    /* this.spheres.forEach((v,i,a) => {
+      var tween = new TWEEN.Tween(v.position).to(v.position.set(0,0,0), 20000);
+      tween.easing(TWEEN.Easing.Elastic.InOut)
+    }) */
+    console.log(this.shouldMorphHead)
+    if(!this.shouldMorphHead) {
+      const vector = new THREE.Vector3();
+      const position = this.head.geometry.attributes.position;
+      for ( let i = 0, l = position.count; i < l; i ++ ) {
+        vector.fromBufferAttribute( position, i );
+        vector.applyMatrix4( this.head.matrixWorld );
+        new TWEEN.Tween( this.spheres[i].position )
+						.to( {
+							x: 0,
+							y: 0,
+							z: 0
+						}, Math.random() * 2000 )
+						.easing( TWEEN.Easing.Exponential.InOut )
+						.start();
 
-    this.mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
-    this.mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
-
-    this.raycaster.setFromCamera(this.mouse, this.camera)
-    this.raycaster.far = 5;
-
-    const intersects = this.raycaster.intersectObjects( this.scene.children );
-
-    if(intersects.length > 0) {
-      if(intersects[0].object.name.length > 10) {
-        this.controls.object.position.set(intersects[0].object.position.x, intersects[0].object.position.y, intersects[0].object.position.z + 2);
-        this.controls.lookAt(intersects[0].object.position.x, intersects[0].object.position.y, intersects[0].object.position.z);
-        this.travelTarget = new Vector3(intersects[0].object.position.x, intersects[0].object.position.y, intersects[0].object.position.z + 2);
-        let nftDiv = document.getElementById('nft');
-        nftDiv.setAttribute('style', 'display: block;');
-        if(document.getElementById('nft-card')) {
-          document.getElementById('nft-card').remove();
-        }
-        let nftElement = document.createElement('nft-card')
-        nftElement.setAttribute('tokenId', intersects[0].object.name)
-        nftElement.setAttribute('contractAddress', "0x495f947276749Ce646f68AC8c248420045cb7b5e")
-        nftElement.setAttribute('vertical', '')
-        nftElement.setAttribute('id', 'nft-card')
-        nftDiv.appendChild(nftElement);
-        this.controlsActivation(false);
-        console.log(intersects[0].object.name)
-        //this.controls.lookAt(intersects[0].object.position.x, intersects[0].object.position.y, intersects[0].object.position.z)
+        //this.spheres[i].position.set(vector.x , vector.y, vector.z)
       }
+      setTimeout(() => {
+        this.transition(this.head)
+      }, 2000);
+      this.shouldMorphHead = true;
+      return;
+    }
+    if(this.shouldMorphHead) {
+      const vector = new THREE.Vector3();
+      const position = this.picapau.geometry.attributes.position;
+      for ( let i = 0, l = position.count; i < l; i ++ ) {
+        vector.fromBufferAttribute( position, i );
+        vector.applyMatrix4( this.picapau.matrixWorld );
+        new TWEEN.Tween( this.spheres[i].position )
+						.to( {
+							x: 0,
+							y: 0,
+							z: 0
+						}, Math.random() * 2000 )
+						.easing( TWEEN.Easing.Exponential.InOut )
+						.start();
+      }
+      setTimeout(() => {
+        this.transition(this.picapau)
+      }, 2000);
+      this.shouldMorphHead = false
     }
   }
-
-  public controlsActivation(active: boolean): void {
-    this.controls.activeLook = active;
-    this.controls.enabled = active;
+  private transition(target: THREE.Mesh) {
+    console.log('transition')
+    const vector = new THREE.Vector3();
+      const position = target.geometry.attributes.position;
+      for ( let i = 0, l = position.count; i < l; i ++ ) {
+        vector.fromBufferAttribute( position, i );
+        vector.applyMatrix4( target.matrixWorld );
+        new TWEEN.Tween( this.spheres[i].position )
+						.to( {
+							x: vector.x,
+							y: vector.y,
+							z: vector.z
+						}, Math.random() * 2000 )
+						.easing( TWEEN.Easing.Exponential.InOut )
+						.start();
+    }
   }
+  private saveAsImage(text: string) {
+    var imgData; //Image data as base 64
+
+    try {
+        var strMime = "image/jpeg";
+        imgData = this.renderer.domElement.toDataURL(strMime);
+        this.saveFile(imgData.replace(strMime, "image/octet-stream"),text + ".jpg");
+    } catch (e) {
+        console.log(e);
+        return;
+    }
+  }
+  private saveFile(strData, filename) {
+    this.request.saveImage('1736253', strData)
+    var link = document.createElement('a');
+    if (typeof link.download === 'string') {
+        document.body.appendChild(link); //Firefox requires the link to be in the body
+        link.download = filename;
+        link.href = strData;
+        link.click();
+        document.body.removeChild(link); //remove the link when done
+    } else {
+        location.replace('uri');
+    }
+}
 }
