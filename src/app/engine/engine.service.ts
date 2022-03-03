@@ -25,9 +25,18 @@ export class EngineService implements OnDestroy {
   private copyPass: ShaderPass;
   private smokeParticles = [];
   private spheres: THREE.Mesh[];
+  private mixer : THREE.AnimationMixer;
+
+  private vertex = new THREE.Vector3();
+  private temp = new THREE.Vector3();
+  private skinned = new THREE.Vector3();
+  private skinIndices = new THREE.Vector4();
+  private skinWeights = new THREE.Vector4();
+  private boneMatrix = new THREE.Matrix4();
 
   private cube: THREE.Mesh;
   private head: THREE.Mesh;
+  private headPoints: THREE.Group;
   private picapau: THREE.Mesh;
   private morph: number = 0;
   private shouldMorphHead;
@@ -47,6 +56,7 @@ export class EngineService implements OnDestroy {
     // The first step is to get the reference of the canvas element from our HTML document
     console.log(TWEEN)
     this.canvas = canvas.nativeElement;
+    this.headPoints = new THREE.Group;
     let group = new THREE.Group();
 				group.position.y = 100;
     this.renderer = new THREE.WebGLRenderer({
@@ -64,7 +74,7 @@ export class EngineService implements OnDestroy {
     this.camera = new THREE.PerspectiveCamera(
       30, window.innerWidth / window.innerHeight, 1, 1500
     );
-    this.camera.position.set( 0, 0, 10 );
+    this.camera.position.set( 0, 0, 15 );
     this.scene.add(this.camera);
 
     // soft white light
@@ -115,28 +125,43 @@ export class EngineService implements OnDestroy {
 
     //Head
     const loader = new GLTFLoader();
-    loader.load( 'assets/models/Ciana.glb',(gltf) => {
-      gltf.scene.position.set(0, -15,0)
-      this.head = gltf.scene.children[0] as THREE.Mesh;
+    loader.load( 'assets/models/Cian.glb',(gltf) => {
+      gltf.scene.position.set(0, 0, 0)
+      this.mixer = new THREE.AnimationMixer( gltf.scene.children[0] );
+      const clips = gltf.animations;
+      this.mixer.timeScale = 1
+      const clip = THREE.AnimationClip.findByName( clips, 'Fala01' );
+      const action = this.mixer.clipAction( clip );
+      action.clampWhenFinished = true;
+      action.play();
+      console.log(gltf)
+      this.head = gltf.scene.children[0].children[10].children[0] as THREE.Mesh;
+      this.headPoints = (gltf.scene.children[1] as THREE.Group);
+      //this.head = gltf.scene.children[0] as THREE.Mesh;
       this.scene.add( gltf.scene );
-      console.log(this.head.geometry.isBufferGeometry);
-      this.head.morphTargetInfluences[0] = 1
-      this.head.visible = false;
+      console.log(this.head);
+      //this.head.morphTargetInfluences[0] = 1
+      this.head.visible = true;
       const position = this.head.geometry.attributes.position;
       const vector = new THREE.Vector3();
+      this.head.updateMatrixWorld();
       for ( let i = 0, l = position.count; i < l; i ++ ) {
         vector.fromBufferAttribute( position, i );
-        vector.applyMatrix4( this.head.matrixWorld );
-        const sphere = new THREE.Mesh(new THREE.SphereGeometry(.006), new THREE.MeshStandardMaterial({color: new THREE.Color(0xffffff)}));
-        sphere.position.set(vector.x , vector.y - 15, vector.z)
+        vector.applyMatrix4( this.head.matrix );
+        const sphere = new THREE.Mesh(new THREE.SphereGeometry(.04), new THREE.MeshStandardMaterial({color: new THREE.Color(0xffffff)}));
+        sphere.position.set(vector.x , vector.y, vector.z)
+        sphere.visible = false;
         this.scene.add(sphere)
         this.spheres.push(sphere)
         //console.log(vector); 
       }
-      //this.head.morphTargetInfluences[0] = this.morph
+      //this.head.morphTargetInfluences[0] = this.morp
+      console.log(this.head)
       const headMaterial = new THREE.MeshStandardMaterial;
+      headMaterial.emissive =  new THREE.Color('yellow');
+      headMaterial.emissiveIntensity = 1;
       headMaterial.wireframe = true;
-      headMaterial.color = new THREE.Color(0xFFFFFF);
+      headMaterial.color = new THREE.Color('yellow');
       (this.head.material as THREE.MeshStandardMaterial).wireframe = true;
 
     }, undefined, function ( error ) {
@@ -195,10 +220,17 @@ export class EngineService implements OnDestroy {
     this.frameId = requestAnimationFrame(() => {
       this.render();
     });
+      //const vector = new THREE.Vector3();
+      //const position = this.head.geometry.attributes.position;
+      /* for ( let i = 0; i < this.spheres.length; i ++ ) {
+        this.updateAABB(this.head, this.spheres[i])
+      } */
+      //this.updateAABB(this.head, this.spheres[0])
 
     TWEEN.update();
 
     this.renderer.render(this.scene, this.camera);
+    this.mixer.update(1)
     //this.composer.render( 0.05 )
   }
 
@@ -223,6 +255,10 @@ export class EngineService implements OnDestroy {
     }) */
     console.log(this.shouldMorphHead)
     if(!this.shouldMorphHead) {
+      this.headPoints.visible = false;
+      this.spheres.forEach((v,i,a) => {
+        v.visible = true;
+      })
       const vector = new THREE.Vector3();
       const position = this.head.geometry.attributes.position;
       for ( let i = 0, l = position.count; i < l; i ++ ) {
@@ -281,7 +317,13 @@ export class EngineService implements OnDestroy {
 						}, Math.random() * 2000 )
 						.easing( TWEEN.Easing.Exponential.InOut )
 						.start();
-    }
+      }
+      setTimeout(() => {
+        this.headPoints.visible = true;
+        this.spheres.forEach((v,i,a) => {
+          v.visible = false;
+        })
+      }, 2000)
   }
   private saveAsImage(text: string) {
     var imgData; //Image data as base 64
@@ -307,5 +349,103 @@ export class EngineService implements OnDestroy {
     } else {
         location.replace('uri');
     }
-}
+  }
+
+  private updateAABB( skinnedMesh, aabb ) {
+	
+    var skeleton = skinnedMesh.skeleton;
+    var boneMatrices = skeleton.boneMatrices;
+    var geometry = skinnedMesh.geometry;
+    
+    var index = geometry.index;
+    var position = geometry.attributes.position;
+    var skinIndex = geometry.attributes.skinIndex;
+    var skinWeigth = geometry.attributes.skinWeight;
+    
+    var bindMatrix = skinnedMesh.bindMatrix;
+    var bindMatrixInverse = skinnedMesh.bindMatrixInverse;
+    
+    var i, j, si, sw;
+    
+    //aabb.makeEmpty();
+  
+    // 
+    
+    if ( index !== null ) {
+    
+      // indexed geometry
+    
+      for ( i = 0; i < index.count; i ++ ) {
+      
+        this.vertex.fromBufferAttribute( position, index[ i ] );
+        this.skinIndices.fromBufferAttribute( skinIndex, index[ i ] );
+        this.skinWeights.fromBufferAttribute( skinWeigth, index[ i ] );
+        
+        // the following code section is normally implemented in the vertex shader
+  
+        this.vertex.applyMatrix4( bindMatrix ); // transform to bind space
+        this.skinned.set( 0, 0, 0 );
+  
+        for ( j = 0; j < 4; j ++ ) {
+  
+           si = this.skinIndices.getComponent( j );
+          sw = this.skinWeights.getComponent( j );
+          this.boneMatrix.fromArray( boneMatrices, si * 16 );
+  
+          // weighted vertex transformation
+  
+          this.temp.copy( this.vertex ).applyMatrix4( this.boneMatrix ).multiplyScalar( sw );
+          this.skinned.add( this.temp );
+  
+        }
+  
+        this.skinned.applyMatrix4( bindMatrixInverse ); // back to local space
+  
+        // expand aabb
+  
+        aabb.position.set( this.skinned.x, this.skinned.y, this.skinned.z );
+      
+      }
+    
+    } else {
+    
+      // non-indexed geometry
+    
+      for ( i = 0; i < position.count; i ++ ) {
+      
+        this.vertex.fromBufferAttribute( position, i );
+        this.skinIndices.fromBufferAttribute( skinIndex, i );
+        this.skinWeights.fromBufferAttribute( skinWeigth, i );
+        
+        // the following code section is normally implemented in the vertex shader
+  
+        this.vertex.applyMatrix4( bindMatrix ); // transform to bind space
+        this.skinned.set( 0, 0, 0 );
+  
+        for ( j = 0; j < 4; j ++ ) {
+  
+          si = this.skinIndices.getComponent( j );
+          sw = this.skinWeights.getComponent( j );
+          this.boneMatrix.fromArray( boneMatrices, si * 16 );
+  
+          // weighted vertex transformation
+  
+          this.temp.copy( this.vertex ).applyMatrix4( this.boneMatrix ).multiplyScalar( sw );
+          this.skinned.add( this.temp );
+  
+        }
+  
+        this.skinned.applyMatrix4( bindMatrixInverse ); // back to local space
+  
+        // expand aabb
+  
+        aabb.expandByPoint( this.skinned );
+        
+      }
+    
+    }
+    
+    aabb.applyMatrix4( skinnedMesh.matrixWorld );
+  
+  }
 }
